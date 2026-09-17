@@ -2324,7 +2324,11 @@ type KeywordSpotterConfig struct {
 }
 
 type KeywordSpotterResult struct {
-	Keyword string
+	Keyword    string
+	Tokens     []string
+	Timestamps []float32
+	StartTime  float32
+	Json       string
 }
 
 type KeywordSpotter struct {
@@ -2465,8 +2469,26 @@ func (spotter *KeywordSpotter) Reset(s *OnlineStream) {
 func (spotter *KeywordSpotter) GetResult(s *OnlineStream) *KeywordSpotterResult {
 	p := C.SherpaOnnxGetKeywordResult(spotter.impl, s.impl)
 	defer C.SherpaOnnxDestroyKeywordResult(p)
-	result := &KeywordSpotterResult{}
-	result.Keyword = C.GoString(p.keyword)
+	n := int(p.count)
+	result := &KeywordSpotterResult{
+		Keyword:   C.GoString(p.keyword),
+		StartTime: float32(p.start_time),
+		Json:      C.GoString(p.json),
+	}
+	if n > 0 {
+		result.Tokens = make([]string, n)
+		tokens := unsafe.Slice(p.tokens_arr, n)
+		for i := 0; i < n; i++ {
+			result.Tokens[i] = C.GoString(tokens[i])
+		}
+	}
+	if p.timestamps != nil && n > 0 {
+		result.Timestamps = make([]float32, n)
+		timestamps := unsafe.Slice(p.timestamps, n)
+		for i := 0; i < n; i++ {
+			result.Timestamps[i] = float32(timestamps[i])
+		}
+	}
 	return result
 }
 
